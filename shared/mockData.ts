@@ -1,6 +1,6 @@
-import { TimelineEvent } from "../lib/types";
+import { type InsertTimelineEvent } from "./schema";
 
-export const MOCK_EVENTS: TimelineEvent[] = [
+export const DEFAULT_EVENTS: InsertTimelineEvent[] = [
   {
     id: "evt-001",
     title: "AGI reaches human-level performance",
@@ -11,10 +11,14 @@ export const MOCK_EVENTS: TimelineEvent[] = [
     suggestedProb: 65,
     yourProb: 75,
     effectiveProb: 75,
-    description: "Major AI labs release models that score equivalent to human experts on a broad suite of reasoning and creativity tasks.",
+    description:
+      "Major AI labs release models that score equivalent to human experts on a broad suite of reasoning and creativity tasks.",
     rationale: "Advanced scaling laws and specialized inference hardware breakthroughs.",
     planningPrompts: "How will your workforce adapt? What IP risks does this introduce?",
-    sources: [{ title: "FutureTimeline Report", url: "#" }, { title: "AI Index 2025", url: "#" }],
+    sources: [
+      { title: "FutureTimeline Report", url: "#" },
+      { title: "AI Index 2025", url: "#" },
+    ],
   },
   {
     id: "evt-002",
@@ -28,7 +32,8 @@ export const MOCK_EVENTS: TimelineEvent[] = [
     effectiveProb: 55,
     description: "ITER achieves first plasma with net energy gain sustained for >10 minutes.",
     rationale: "Successful magnetic confinement tests in smaller tokamaks.",
-    planningPrompts: "Investigate long-term energy contracts. Re-evaluate carbon footprint goals.",
+    planningPrompts:
+      "Investigate long-term energy contracts. Re-evaluate carbon footprint goals.",
     sources: [{ title: "Nature Energy", url: "#" }],
   },
   {
@@ -70,7 +75,8 @@ export const MOCK_EVENTS: TimelineEvent[] = [
     suggestedProb: 80,
     yourProb: 85,
     effectiveProb: 85,
-    description: "Federal legislation passes allowing fully driverless vehicles on all public roads without geofencing.",
+    description:
+      "Federal legislation passes allowing fully driverless vehicles on all public roads without geofencing.",
     planningPrompts: "Logistics fleet automation strategy?",
     sources: [{ title: "DOT Report", url: "#" }],
   },
@@ -83,7 +89,8 @@ export const MOCK_EVENTS: TimelineEvent[] = [
     suggestedProb: 75,
     yourProb: 80,
     effectiveProb: 80,
-    description: "Lab-grown beef becomes cheaper than traditional agriculture beef in major supermarkets.",
+    description:
+      "Lab-grown beef becomes cheaper than traditional agriculture beef in major supermarkets.",
     sources: [{ title: "Food Tech Daily", url: "#" }],
   },
   {
@@ -118,21 +125,23 @@ export const MOCK_EVENTS: TimelineEvent[] = [
     category: "Society & Policy",
     region: "EU",
     suggestedProb: 50,
-    yourProb: 40,
-    effectiveProb: 40,
-    description: "Large scale UBI trial across 3 EU member states.",
-    sources: [{ title: "EuroNews", url: "#" }],
+    yourProb: 55,
+    effectiveProb: 55,
+    description: "EU launches coordinated UBI pilot across 5 member states.",
+    planningPrompts: "Labor market implications? Consumer demand shifts?",
+    sources: [{ title: "EU Commission", url: "#" }],
   },
   {
     id: "evt-010",
-    title: "Quantum Advantage in Logistics",
+    title: "Quantum-Proof Encryption Mandated",
     startMonth: "2028-06",
     category: "Science & Technology",
-    region: "China",
-    suggestedProb: 70,
-    yourProb: 80,
-    effectiveProb: 80,
-    description: "Quantum annealing solves complex routing problems 1000x faster than classical supercomputers.",
-    sources: [{ title: "Nature Physics", url: "#" }],
-  }
+    region: "Global",
+    suggestedProb: 35,
+    yourProb: 45,
+    effectiveProb: 45,
+    description: "Major regulators require migration to post-quantum cryptography for critical infrastructure.",
+    planningPrompts: "Assess crypto agility of all systems.",
+    sources: [{ title: "NIST", url: "#" }],
+  },
 ];
