@@ -1,6 +1,6 @@
-import React, { useState, useMemo, useEffect } from "react";
-import { TimelineEvent, TimelineState, Category, Region } from "@/lib/types";
-import { MOCK_EVENTS } from "@/data/mockData";
+import React, { useMemo, useState, useEffect } from "react";
+import { TimelineEvent, TimelineState, InsertTimelineEvent, Category, Region } from "@/lib/types";
+import { categoryValues, regionValues } from "@shared/schema";
 import { TimelineGrid } from "@/components/TimelineGrid";
 import { InspectorPanel } from "@/components/InspectorPanel";
 import { FilterBar } from "@/components/FilterBar";
@@ -9,42 +9,78 @@ import { Button } from "@/components/ui/button";
 import { PanelRightClose, PanelRightOpen, Layers, RefreshCw } from "lucide-react";
 import { AnimatePresence, motion } from "framer-motion";
 import { toast } from "@/hooks/use-toast";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { fetchEvents, importEvents, resetEvents, updateEvent } from "@/lib/api";
 
-const STORAGE_KEY = "future_timeline_data";
+const DEFAULT_FILTERS: TimelineState["filters"] = {
+  categories: [...categoryValues] as Category[],
+  regions: [...regionValues] as Region[],
+  search: "",
+  minProb: 0,
+};
 
 export default function Home() {
-  const [events, setEvents] = useState<TimelineEvent[]>(() => {
-    const saved = localStorage.getItem(STORAGE_KEY);
-    if (saved) {
-      try {
-        return JSON.parse(saved);
-      } catch (e) {
-        console.error("Failed to parse saved data", e);
-        return MOCK_EVENTS;
-      }
-    }
-    return MOCK_EVENTS;
-  });
-
+  const queryClient = useQueryClient();
   const [displayMode, setDisplayMode] = useState<"range" | "start-only">("range");
   const [selectedEventId, setSelectedEventId] = useState<string | null>(null);
   const [showInspector, setShowInspector] = useState(true);
+  const [filters, setFilters] = useState<TimelineState["filters"]>(DEFAULT_FILTERS);
 
-  const [filters, setFilters] = useState<TimelineState["filters"]>({
-    categories: ["AI & Robotics", "Science & Technology", "Society & Policy", "Society & Culture", "Space", "Environment", "Other"],
-    regions: ["Global", "USA", "EU", "China", "India", "Africa", "Other"],
-    search: "",
-    minProb: 0
+  const eventsQuery = useQuery<TimelineEvent[]>({
+    queryKey: ["events"],
+    queryFn: fetchEvents,
   });
 
-  // Persist data whenever it changes
+  const events = eventsQuery.data ?? [];
+
   useEffect(() => {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(events));
-  }, [events]);
+    if (!events.length) {
+      setSelectedEventId(null);
+    }
+  }, [events.length]);
+
+  const updateMutation = useMutation({
+    mutationFn: ({ id, updates }: { id: string; updates: Partial<TimelineEvent> }) =>
+      updateEvent(id, updates),
+    onSuccess: (updated) => {
+      queryClient.setQueryData<TimelineEvent[]>(["events"], (prev = []) =>
+        prev.map((evt) => (evt.id === updated.id ? updated : evt)),
+      );
+    },
+    onError: () =>
+      toast({ title: "Update failed", description: "Could not save your changes.", variant: "destructive" }),
+  });
+
+  const importMutation = useMutation({
+    mutationFn: (newEvents: InsertTimelineEvent[]) => importEvents(newEvents),
+    onSuccess: (saved) => {
+      queryClient.setQueryData(["events"], saved);
+      setSelectedEventId(null);
+      toast({ title: "Dataset imported", description: `${saved.length} events saved to the database.` });
+    },
+    onError: () =>
+      toast({ title: "Import failed", description: "Could not save uploaded events.", variant: "destructive" }),
+  });
+
+  const resetMutation = useMutation({
+    mutationFn: resetEvents,
+    onSuccess: (reset) => {
+      queryClient.setQueryData(["events"], reset);
+      setSelectedEventId(null);
+      setFilters(DEFAULT_FILTERS);
+      toast({ title: "Reset complete", description: "Timeline restored to default research set." });
+    },
+    onError: () =>
+      toast({ title: "Reset failed", description: "Could not reset dataset.", variant: "destructive" }),
+  });
 
   const filteredEvents = useMemo(() => {
-    return events.filter(evt => {
-      if (filters.search && !evt.title.toLowerCase().includes(filters.search.toLowerCase()) && !evt.description.toLowerCase().includes(filters.search.toLowerCase())) {
+    return events.filter((evt) => {
+      if (
+        filters.search &&
+        !evt.title.toLowerCase().includes(filters.search.toLowerCase()) &&
+        !evt.description.toLowerCase().includes(filters.search.toLowerCase())
+      ) {
         return false;
       }
       if (filters.categories.length > 0 && !filters.categories.includes(evt.category)) {
@@ -63,27 +99,32 @@ export default function Home() {
   };
 
   const handleEventUpdate = (id: string, updates: Partial<TimelineEvent>) => {
-    setEvents(prev => prev.map(e => e.id === id ? { ...e, ...updates } : e));
+    updateMutation.mutate({ id, updates });
   };
 
-  const resetToDefault = () => {
-    setEvents(MOCK_EVENTS);
-    setSelectedEventId(null);
-    localStorage.removeItem(STORAGE_KEY);
-    toast({
-      title: "Reset Complete",
-      description: "Dataset has been reset to the latest researched defaults.",
-    });
+  const handleImport = (newEvents: InsertTimelineEvent[]) => {
+    importMutation.mutate(newEvents);
   };
 
-  const selectedEvent = useMemo(() => 
-    events.find(e => e.id === selectedEventId) || null
-  , [events, selectedEventId]);
+  const handleReset = () => {
+    resetMutation.mutate();
+  };
+
+  const selectedEvent = useMemo(
+    () => events.find((e) => e.id === selectedEventId) || null,
+    [events, selectedEventId],
+  );
+
+  if (eventsQuery.isError) {
+    return (
+      <div className="h-screen w-full flex items-center justify-center text-red-500">
+        Failed to load timeline data.
+      </div>
+    );
+  }
 
   return (
     <div className="h-screen w-full bg-background text-foreground flex flex-col overflow-hidden font-sans">
-      
-      {/* Top Header */}
       <header className="h-14 border-b border-border bg-card/50 backdrop-blur flex items-center justify-between px-4 z-20 shadow-sm">
         <div className="flex items-center gap-2">
           <div className="w-8 h-8 rounded bg-primary/20 flex items-center justify-center border border-primary/50 text-primary">
@@ -95,88 +136,86 @@ export default function Home() {
         </div>
 
         <div className="flex items-center gap-4">
-          <Button 
-            variant="outline" 
-            size="sm" 
-            onClick={resetToDefault}
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleReset}
+            disabled={resetMutation.isPending}
             className="gap-2 border-primary/20 text-muted-foreground hover:text-primary transition-colors"
           >
             <RefreshCw className="w-3 h-3" /> Reset Data
           </Button>
-          <ExcelHandler 
+          <ExcelHandler
             events={events}
             onDataLoaded={(newEvents) => {
-              setEvents(newEvents);
-              setSelectedEventId(null);
-            }} 
+              handleImport(newEvents);
+            }}
           />
         </div>
       </header>
 
-      {/* Filter Controls */}
-      <FilterBar 
-        filters={filters} 
-        setFilters={setFilters} 
-        displayMode={displayMode} 
+      <FilterBar
+        filters={filters}
+        setFilters={setFilters}
+        displayMode={displayMode}
         setDisplayMode={setDisplayMode}
       />
 
-      {/* Main Workspace */}
       <div className="flex-1 flex overflow-hidden relative">
-        
-        {/* Timeline Area */}
         <div className="flex-1 relative bg-background/50">
-          <TimelineGrid 
-            events={filteredEvents} 
+          <TimelineGrid
+            events={filteredEvents}
             displayMode={displayMode}
             onEventClick={handleEventClick}
             selectedEventId={selectedEventId}
           />
-          
-          {/* Toggle Inspector Button (if closed) */}
+
+          {eventsQuery.isLoading && (
+            <div className="absolute inset-0 bg-background/70 flex items-center justify-center text-muted-foreground">
+              Loading timeline...
+            </div>
+          )}
+
           {!showInspector && (
-             <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
-               <Button 
-                 variant="outline" 
-                 size="icon" 
-                 className="absolute top-4 right-4 z-10 shadow-lg bg-card border-primary/20 text-primary hover:bg-primary/10"
-                 onClick={() => setShowInspector(true)}
-               >
-                 <PanelRightOpen className="w-4 h-4" />
-               </Button>
-             </motion.div>
+            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
+              <Button
+                variant="outline"
+                size="icon"
+                className="absolute top-4 right-4 z-10 shadow-lg bg-card border-primary/20 text-primary hover:bg-primary/10"
+                onClick={() => setShowInspector(true)}
+              >
+                <PanelRightOpen className="w-4 h-4" />
+              </Button>
+            </motion.div>
           )}
         </div>
 
-        {/* Inspector Panel (Animated) */}
         <AnimatePresence mode="popLayout">
           {showInspector && (
-            <motion.div 
+            <motion.div
               initial={{ x: "100%", opacity: 0 }}
               animate={{ x: 0, opacity: 1 }}
               exit={{ x: "100%", opacity: 0 }}
               transition={{ type: "spring", stiffness: 300, damping: 30 }}
               className="h-full border-l border-border shadow-2xl relative z-30"
             >
-              <InspectorPanel 
-                event={selectedEvent} 
+              <InspectorPanel
+                event={selectedEvent}
                 onClose={() => setShowInspector(false)}
                 onUpdate={handleEventUpdate}
               />
-              {/* Toggle Button Inside Panel */}
-               <Button 
-                 variant="ghost" 
-                 size="icon" 
-                 className="absolute top-4 right-14 z-40 text-muted-foreground hover:text-foreground"
-                 onClick={() => setShowInspector(false)}
-                 title="Close Panel"
-               >
-                 <PanelRightClose className="w-4 h-4" />
-               </Button>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="absolute top-4 right-14 z-40 text-muted-foreground hover:text-foreground"
+                onClick={() => setShowInspector(false)}
+                title="Close Panel"
+              >
+                <PanelRightClose className="w-4 h-4" />
+              </Button>
             </motion.div>
           )}
         </AnimatePresence>
-
       </div>
     </div>
   );
